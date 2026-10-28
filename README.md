@@ -10,9 +10,9 @@ Know how much effort an OAuth setup is
 
 ---
 
-<a href="docs/demo.mp4"><img src="docs/demo.gif" alt="Typing Notion into OAuthor and watching the guide fill in, box by box" width="100%"></a>
+<a href="https://drive.google.com/file/d/1AAgDBl3zdeQUxSS5DhSlx2QNyDr1Okd4/view?usp=sharing"><img src="docs/demo.gif" alt="OAuthor demo" width="100%"></a>
 
-<p align="center"><sub>Click for the full 50-second demo.</sub></p>
+<p align="center"><sub>Click for the full demo.</sub></p>
 
 OAuthor tells developers the lead time and effort associated with registering their OAuth app with any provider. I believe this is a pretty useful tool for Composio's Toolkit once the users move off testing and want to take their apps to prod.
 
