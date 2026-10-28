@@ -20,7 +20,7 @@ Type any app's name, an agent reads the provider's developer docs, and writes yo
 
 ## Demo
 
-Five guides are in the library, picked to cover the whole range.
+Five guides (probably more now) are already in the library, which I picked to cover the whole range.
 
 | App | Difficulty | What decides it |
 |---|---|---|
@@ -46,18 +46,21 @@ research_app(name)   → 2 Firecrawl searches, then up to 6 doc pages read in fu
 render_guide(guide)  → stream the guide into the page, validate it, save it to Supabase
 ```
 
-The guide streams in as JSON. Follow the progress row in the chat bubble to see which tool is running.
+The guide streams in as JSON and builds a Bento grid UI generatively. The progress bar in the chat bubble shows which tool is running. The guide is persisted once anybody generates a new one. If a guide for an app already exists, the Agent just redirects you to it. 
 
-Continue chatting with the agent for more information. 
+After the guide comes through, the chat bubble can still be used to ask more questions to the Agent about the integrations. Continue chatting with the agent for more information. 
 
 Each app guide has its own conversation [stored locally in your browser (IndexedDB)]. 
 Guides, once generated, are stored in a database for persistence. 
 
+Each guide tells you a difficulty score, time to implement and lead time (for approval cycle). It contains steps to tell you how to proceed and, most importantly, where the common bottlenecks are. The last section are the references from the official sources which the developer can go and read. 
 
 
 ## How I built it
 
-Built with Claude using my custom [/pstack](https://github.com/cursor/plugins/tree/main/pstack) setup.
+Began work on this at around ~12:30PM and was done around ~6PM. The major time was spent researching what would make this useful and how Composio would benefit from a feature like this. Researched [Nango](https://nango.dev/api-integrations) as well. I am pretty experienced with OAuth registrations from working at my previous companies so I understood the pain point pretty well from the get go. What I was unsure of was the modality - how to present the data, what to include in the data, what would be useful to me. Landed on a Bento grid approach with generative UI.
+
+I built this with Claude using my custom [/pstack](https://github.com/cursor/plugins/tree/main/pstack) setup.
 
 - **Spec generation.** I had Claude Code [/grill-me](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me) one question at a time until the deliverable was pinned down. I decided on who the user is, what the guide must answer, and what to leave out. The decisions are in [`SPEC.md`](SPEC.md).
 
