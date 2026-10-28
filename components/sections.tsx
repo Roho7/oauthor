@@ -1,18 +1,19 @@
 import type { ReactNode } from "react";
 import type { DeepPartial } from "ai";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Sparkles } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import type { Guide } from "@/lib/guide";
 import { cn } from "@/lib/utils";
 
 export type PartialGuide = DeepPartial<Guide>;
 
-export type Slot = "top" | "main" | "side" | "full";
-
-type Section = {
+export type Section = {
   key: string;
   title: string;
-  slot: Slot;
+  column: "full" | "main" | "side";
+  order: string;
   ready: (g: PartialGuide) => boolean;
+  aside?: (g: PartialGuide) => ReactNode;
   render: (g: PartialGuide) => ReactNode;
 };
 
@@ -26,6 +27,15 @@ export function DifficultyMeter({ level, className }: { level: number; className
         <span key={n} className={cn("h-2 flex-1 rounded-full", n <= level ? "bg-signal" : "bg-secondary")} />
       ))}
     </div>
+  );
+}
+
+function AgentBadge() {
+  return (
+    <span className="inline-flex h-6 items-center gap-1 rounded-full bg-signal-soft pr-2.5 pl-2 text-xs font-medium text-signal">
+      <Sparkles className="size-3.5" aria-hidden />
+      AI can do this
+    </span>
   );
 }
 
@@ -52,7 +62,8 @@ export const SECTIONS: Section[] = [
   {
     key: "verdict",
     title: "Verdict",
-    slot: "top",
+    column: "full",
+    order: "order-0",
     ready: (g) => g.difficulty?.level != null,
     render: (g) => {
       const level = g.difficulty?.level ?? 0;
@@ -85,33 +96,26 @@ export const SECTIONS: Section[] = [
   {
     key: "requirements",
     title: "Before you start",
-    slot: "main",
+    column: "side",
+    order: "order-1",
     ready: (g) => present(g.requirements).length > 0,
     render: (g) => <Bullets items={present(g.requirements)} />,
   },
   {
-    key: "agentHelp",
-    title: "Who does what",
-    slot: "side",
-    ready: (g) => present(g.agentHelp?.canDo).length > 0 || present(g.agentHelp?.youMustDo).length > 0,
-    render: (g) => (
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-        <div className="rounded-xl bg-muted p-4">
-          <h4 className="mb-3 text-sm font-medium">An agent can</h4>
-          <Bullets items={present(g.agentHelp?.canDo)} />
-        </div>
-        <div className="rounded-xl bg-muted p-4">
-          <h4 className="mb-3 text-sm font-medium">You have to</h4>
-          <Bullets items={present(g.agentHelp?.youMustDo)} />
-        </div>
-      </div>
-    ),
-  },
-  {
     key: "steps",
     title: "Steps",
-    slot: "main",
+    column: "main",
+    order: "order-2",
     ready: (g) => present(g.steps).length > 0,
+    aside: (g) => {
+      const steps = present(g.steps);
+      const automatable = steps.filter((s) => s.agentCompatible).length;
+      return automatable > 0 ? (
+        <span className="text-xs text-muted-foreground tnum">
+          {automatable} of {steps.length} can be automated
+        </span>
+      ) : null;
+    },
     render: (g) => (
       <ol className="space-y-1">
         {present(g.steps).map((s, i) => (
@@ -119,8 +123,11 @@ export const SECTIONS: Section[] = [
             <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium tnum">
               {i + 1}
             </span>
-            <div className="min-w-0">
-              <p className="font-medium">{s.title}</p>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <p className="font-medium">{s.title}</p>
+                {s.agentCompatible && <AgentBadge />}
+              </div>
               {s.detail && <p className="mt-1 text-muted-foreground">{s.detail}</p>}
             </div>
           </li>
@@ -129,25 +136,27 @@ export const SECTIONS: Section[] = [
     ),
   },
   {
-    key: "blockers",
-    title: "If you're stuck",
-    slot: "side",
-    ready: (g) => present(g.blockers).length > 0,
+    key: "issues",
+    title: "Where people get stuck",
+    column: "side",
+    order: "order-3",
+    ready: (g) => present(g.issues).length > 0,
     render: (g) => (
-      <dl className="space-y-3">
-        {present(g.blockers).map((b, i) => (
-          <div key={i} className="rounded-xl bg-muted p-4">
-            <dt className="font-medium">{b.problem}</dt>
-            <dd className="mt-1.5 text-muted-foreground">{b.fix}</dd>
-          </div>
+      <Accordion className="gap-2">
+        {present(g.issues).map((issue, i) => (
+          <AccordionItem key={i} value={i} className="rounded-xl bg-muted px-4">
+            <AccordionTrigger className="gap-3 py-3.5 hover:no-underline">{issue.problem}</AccordionTrigger>
+            <AccordionContent className="pb-4 text-muted-foreground">{issue.fix}</AccordionContent>
+          </AccordionItem>
         ))}
-      </dl>
+      </Accordion>
     ),
   },
   {
     key: "references",
     title: "Sources",
-    slot: "full",
+    column: "full",
+    order: "order-4 lg:order-none",
     ready: (g) => present(g.references).length > 0,
     render: (g) => (
       <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

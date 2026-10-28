@@ -20,12 +20,19 @@ export const guideSchema = z.object({
       .describe("Review or verification wait, e.g. '2-6 weeks'; null if none"),
   }),
   requirements: z.array(z.string()).describe("What the developer needs before starting"),
-  agentHelp: z.object({
-    canDo: z.array(z.string()).describe("Tasks an AI agent can do for the developer"),
-    youMustDo: z.array(z.string()).describe("Tasks only the developer can do"),
-  }),
-  steps: z.array(z.object({ title: z.string(), detail: z.string() })),
-  blockers: z.array(z.object({ problem: z.string(), fix: z.string() })),
+  steps: z.array(
+    z.object({
+      title: z.string(),
+      detail: z.string().describe("One or two short sentences"),
+      agentCompatible: z
+        .boolean()
+        .describe("True when an AI agent with browser access could do this step for the developer"),
+    }),
+  ),
+  issues: z
+    .array(z.object({ problem: z.string(), fix: z.string() }))
+    .max(5)
+    .describe("Where people run into issues, most common first"),
   references: z.array(z.object({ title: z.string(), url: z.string() })),
 });
 
@@ -62,10 +69,21 @@ export function repairGuideInput(raw: string): string | null {
   return guideSchema.safeParse(hoisted).success ? JSON.stringify(hoisted) : null;
 }
 
+const storedGuideSchema = z.preprocess((raw) => {
+  if (!isRecord(raw)) return raw;
+  const { blockers, ...rest } = raw;
+  delete rest.agentHelp;
+  const steps = Array.isArray(rest.steps)
+    ? rest.steps.map((s) => (isRecord(s) ? { agentCompatible: false, ...s } : s))
+    : rest.steps;
+  const issues = rest.issues ?? (Array.isArray(blockers) ? blockers.slice(0, 5) : blockers);
+  return { ...rest, steps, issues };
+}, guideSchema);
+
 export const guideRowSchema = z.object({
   slug: z.string(),
   app_name: z.string(),
-  guide: guideSchema,
+  guide: storedGuideSchema,
 });
 
 export type GuideRow = z.infer<typeof guideRowSchema>;

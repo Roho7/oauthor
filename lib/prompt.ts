@@ -11,8 +11,9 @@ Rules for the guide:
 - Extract only from the pages research_app returned. Do not invent requirements, fees, review times or URLs. If the pages do not say, leave it out or state the uncertainty in the text.
 - Cite the pages you used in references, using their real URLs and titles.
 - difficulty.level is 1 (about an hour, no review) to 5 (weeks, business verification or paid tiers). Justify it in difficulty.why.
-- agentHelp.canDo lists work an AI agent can do for the developer (drafting copy, filling forms from a template, generating redirect URLs). youMustDo lists what needs a human (identity or business verification, payments, legal sign-off, video demos).
-- Keep steps ordered, each with a short title and concrete detail.
+- Be brief. Every string is one or two short sentences; no padding, no restating the title.
+- Keep steps ordered, each with a short title and concrete detail. Set agentCompatible to true only when an AI agent with browser access could complete the step for the developer (filling in the app form, adding redirect URIs, choosing scopes, drafting a privacy policy or review answers). It is false for anything that needs the developer themselves: signing up, 2FA, CAPTCHAs, payments, identity or business verification, legal acceptance, recording a demo video.
+- issues lists where people actually run into problems with this provider, most common first, at most 5. Each has the problem as people hit it and the fix. Prefer problems the pages describe (rejections, caps, redirect URI mismatches, scope review, quota limits) over generic advice.
 - If render_guide returns a validation error, fix the input and call it again once.
 
 For plain questions, answer in plain text, briefly. When a guide is being discussed, call get_guide first and answer from it. After render_guide succeeds, reply with one or two sentences and no repeat of the guide.`;

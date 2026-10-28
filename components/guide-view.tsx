@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { SECTIONS, type PartialGuide, type Slot as SlotName } from "./sections";
+import { SECTIONS, type PartialGuide, type Section } from "./sections";
 
 function CopyLink() {
   const [copied, setCopied] = useState(false);
@@ -49,52 +49,37 @@ export function GuideView({ guide, streaming }: { guide: PartialGuide; streaming
         {!streaming && guide.app?.name && <CopyLink />}
       </header>
 
-      <div className="grid gap-3 lg:grid-cols-12">
-        <Slot guide={guide} streaming={streaming} slot="top" className="lg:col-span-12" />
-        <Slot guide={guide} streaming={streaming} slot="main" className="lg:col-span-7" stack />
-        <Slot guide={guide} streaming={streaming} slot="side" className="lg:col-span-5" stack />
-        <Slot guide={guide} streaming={streaming} slot="full" className="lg:col-span-12" />
+      <div className="grid items-start gap-3 lg:grid-cols-12">
+        {cardsIn("full", guide, streaming).slice(0, 1)}
+        <div className="contents lg:col-span-7 lg:flex lg:flex-col lg:gap-3">{cardsIn("main", guide, streaming)}</div>
+        <div className="contents lg:col-span-5 lg:flex lg:flex-col lg:gap-3">{cardsIn("side", guide, streaming)}</div>
+        {cardsIn("full", guide, streaming).slice(1)}
       </div>
     </article>
   );
 }
 
-function Slot({
-  guide,
-  streaming,
-  slot,
-  className,
-  stack,
-}: {
-  guide: PartialGuide;
-  streaming: boolean;
-  slot: SlotName;
-  className: string;
-  stack?: boolean;
-}) {
-  const cards = SECTIONS.filter((s) => s.slot === slot && (streaming || s.ready(guide)));
-  if (cards.length === 0) return null;
-  const body = cards.map((s) => (
-    <Card key={s.key} className="gap-4 py-5">
-      <CardHeader className="px-5">
-        <CardTitle className="text-base">{s.title}</CardTitle>
-      </CardHeader>
-      <CardContent className="h-full px-5 text-sm leading-6">
-        {s.ready(guide) ? (
-          s.render(guide)
-        ) : (
-          <div className="space-y-2.5">
-            <Skeleton className="h-4 w-11/12" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-5/6" />
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  ));
-  return stack ? (
-    <div className={cn("flex flex-col gap-3 lg:self-start", className)}>{body}</div>
-  ) : (
-    <div className={cn("grid", className)}>{body}</div>
-  );
+function cardsIn(column: Section["column"], guide: PartialGuide, streaming: boolean) {
+  return SECTIONS.filter((s) => s.column === column && (streaming || s.ready(guide))).map((s) => {
+    const ready = s.ready(guide);
+    return (
+      <Card key={s.key} className={cn("gap-4 py-5", s.order, s.column === "full" && "lg:col-span-12")}>
+        <CardHeader className="flex flex-row items-baseline justify-between gap-3 px-5">
+          <CardTitle className="text-base">{s.title}</CardTitle>
+          {ready && s.aside?.(guide)}
+        </CardHeader>
+        <CardContent className="px-5 text-sm leading-6">
+          {ready ? (
+            s.render(guide)
+          ) : (
+            <div className="space-y-2.5">
+              <Skeleton className="h-4 w-11/12" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-5/6" />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  });
 }

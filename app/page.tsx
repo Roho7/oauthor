@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, ArrowUp, Check, Loader2 } from "lucide-react";
+import { ArrowRight, ArrowUp, Check, Loader2, X } from "lucide-react";
 import { GuideView } from "@/components/guide-view";
 import { DifficultyMeter, type PartialGuide } from "@/components/sections";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { slugify, type Guide } from "@/lib/guide";
 import { getGuide, listCards, type LibraryCard } from "@/lib/store";
+import { HOME_THREAD, loadThread, moveThread, saveThread } from "@/lib/threads";
 import type { OAuthorMessage, OAuthorTools } from "@/lib/tools";
 
 type ToolName = keyof OAuthorTools;
@@ -38,10 +39,14 @@ function latestRenderPart(messages: OAuthorMessage[]) {
   return null;
 }
 
-function assistantText(messages: OAuthorMessage[]): string {
-  const last = messages.at(-1);
-  if (last?.role !== "assistant") return "";
-  return last.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("").trim();
+type Line = { id: string; role: "user" | "assistant"; text: string };
+
+function threadLines(messages: OAuthorMessage[]): Line[] {
+  return messages.flatMap((m) => {
+    if (m.role !== "user" && m.role !== "assistant") return [];
+    const text = m.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("").trim();
+    return text ? [{ id: m.id, role: m.role, text }] : [];
+  });
 }
 
 function pushApp(slug: string) {
@@ -52,7 +57,12 @@ function pushApp(slug: string) {
 
 export default function Home() {
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
-  const { messages, sendMessage, status, error } = useChat<OAuthorMessage>({ transport });
+  const { messages, sendMessage, setMessages, status, error } = useChat<OAuthorMessage>({ transport });
+  const [threadKey, setThreadKey] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const pendingMove = useRef<string | null>(null);
+  const threadBox = useRef<HTMLDivElement>(null);
+  const busyRef = useRef(false);
   const [input, setInput] = useState("");
   const [cards, setCards] = useState<LibraryCard[]>([]);
   const [libraryError, setLibraryError] = useState<string | null>(null);
@@ -61,6 +71,9 @@ export default function Home() {
   const handledLive = useRef<string | null>(null);
 
   const busy = status === "submitted" || status === "streaming";
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
   const live = latestRenderPart(messages);
 
   const refreshCards = useCallback(() => {
@@ -78,12 +91,26 @@ export default function Home() {
     liveKey.current = live?.key ?? null;
   }, [live?.key]);
 
-  const openGuide = useCallback(async (slug: string, push: boolean) => {
-    const guide = await getGuide(slug).catch(() => null);
-    setHiddenLive(liveKey.current);
-    setOpened({ slug, guide });
-    if (push) pushApp(slug);
-  }, []);
+  const switchThread = useCallback(
+    (key: string) =>
+      loadThread(key).then((loaded) => {
+        if (busyRef.current) return;
+        setMessages(loaded);
+        setThreadKey(key);
+      }),
+    [setMessages],
+  );
+
+  const openGuide = useCallback(
+    async (slug: string, push: boolean) => {
+      const guide = await getGuide(slug).catch(() => null);
+      setHiddenLive(liveKey.current);
+      setOpened({ slug, guide });
+      if (push) pushApp(slug);
+      void switchThread(slug);
+    },
+    [switchThread],
+  );
 
   useEffect(refreshCards, [refreshCards]);
 
@@ -91,21 +118,45 @@ export default function Home() {
     const fromUrl = () => new URLSearchParams(window.location.search).get("app");
     const initial = fromUrl();
     if (initial) void openGuide(initial, false);
+    else void switchThread(HOME_THREAD);
     const onPop = () => {
       const slug = fromUrl();
       if (slug) void openGuide(slug, false);
-      else setOpened(null);
+      else {
+        setOpened(null);
+        void switchThread(HOME_THREAD);
+      }
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [openGuide]);
+  }, [openGuide, switchThread]);
 
   useEffect(() => {
     if (!live || live.part.state !== "output-available" || handledLive.current === live.key) return;
     handledLive.current = live.key;
     pushApp(live.part.output.slug);
+    pendingMove.current = live.part.output.slug;
     refreshCards();
   }, [live, refreshCards]);
+
+  useEffect(() => {
+    if (!threadKey || busy || messages.length === 0) return;
+    const target = pendingMove.current;
+    pendingMove.current = null;
+    if (target && threadKey === HOME_THREAD) {
+      void moveThread(HOME_THREAD, target, messages);
+      setThreadKey(target);
+    } else {
+      void saveThread(threadKey, messages);
+    }
+  }, [messages, busy, threadKey]);
+
+  const lines = threadLines(messages);
+  const lastLine = lines.at(-1)?.text;
+  useEffect(() => {
+    const box = threadBox.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [lines.length, lastLine, chatOpen]);
 
   const showLive = live != null && live.key !== hiddenLive && live.part.state !== "output-error";
   const liveGuide = showLive ? (live.part.input as PartialGuide | undefined) : undefined;
@@ -122,8 +173,8 @@ export default function Home() {
     setOpened(null);
     setHiddenLive(liveKey.current);
     window.history.pushState(null, "", window.location.pathname);
+    void switchThread(HOME_THREAD);
   };
-  const text = assistantText(messages);
   const renderFailed = live?.part.state === "output-error" ? live.part.errorText : null;
 
   const submit = (e: React.FormEvent) => {
@@ -131,6 +182,7 @@ export default function Home() {
     const value = input.trim();
     if (!value || busy) return;
     setInput("");
+    setChatOpen(true);
     void sendMessage({ text: value }, { body: { openApp: activeSlug } });
   };
 
@@ -189,15 +241,37 @@ export default function Home() {
 
       <div className="pointer-events-none fixed inset-x-0 bottom-0 px-4 pb-5 sm:px-6">
         <div className="pointer-events-auto mx-auto w-full max-w-3xl space-y-3">
-          {(text || error) && (
-            <div className="max-h-48 overflow-y-auto rounded-2xl bg-card px-5 py-4 text-sm leading-6 whitespace-pre-wrap shadow-float">
-              {error ? <span className="text-destructive">{error.message}</span> : text}
+          {chatOpen && (lines.length > 0 || error) && (
+            <div className="relative rounded-2xl bg-card shadow-float">
+              <button
+                type="button"
+                onClick={() => setChatOpen(false)}
+                aria-label="Close conversation"
+                className="absolute -top-2.5 -right-2.5 z-10 flex size-7 items-center justify-center rounded-full bg-card text-muted-foreground shadow-float transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              >
+                <X className="size-3.5" />
+              </button>
+              <div ref={threadBox} className="max-h-48 space-y-3 overflow-y-auto px-5 py-4 text-sm leading-6" aria-live="polite">
+                {lines.map((line) =>
+                  line.role === "user" ? (
+                    <p key={line.id} className="ml-auto w-fit max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 whitespace-pre-wrap">
+                      {line.text}
+                    </p>
+                  ) : (
+                    <p key={line.id} className="max-w-[92%] whitespace-pre-wrap">
+                      {line.text}
+                    </p>
+                  ),
+                )}
+                {error && <p className="text-destructive">{error.message}</p>}
+              </div>
             </div>
           )}
           <form onSubmit={submit} className="flex items-center gap-2 rounded-full bg-card p-1.5 pl-5 shadow-float">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onFocus={() => setChatOpen(true)}
               placeholder={activeSlug ? "Ask about this guide" : "Name any app, like Zoom"}
               aria-label="Ask about an app"
               className="h-10 flex-1 border-0 bg-transparent px-0 text-[15px] shadow-none focus-visible:ring-0"
