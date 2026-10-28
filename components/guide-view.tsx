@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Link2 } from "lucide-react";
+import { AppLogo } from "@/components/app-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,20 +32,23 @@ export function GuideView({ guide, streaming }: { guide: PartialGuide; streaming
   return (
     <article aria-busy={streaming}>
       <header className="mb-5 flex flex-wrap items-end justify-between gap-4 px-1">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {guide.app?.name ?? <Skeleton className="h-8 w-40" />}
-          </h1>
-          {guide.app?.website && (
-            <a
-              href={guide.app.website}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1 block truncate text-sm text-muted-foreground hover:text-foreground hover:underline"
-            >
-              {guide.app.website}
-            </a>
-          )}
+        <div className="flex min-w-0 items-center gap-3.5">
+          {guide.app?.name && <AppLogo name={guide.app.name} className="size-11 rounded-xl bg-card text-lg shadow-soft" />}
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {guide.app?.name ?? <Skeleton className="h-8 w-40" />}
+            </h1>
+            {guide.app?.website && (
+              <a
+                href={guide.app.website}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 block truncate text-sm text-muted-foreground hover:text-foreground hover:underline"
+              >
+                {guide.app.website}
+              </a>
+            )}
+          </div>
         </div>
         {!streaming && guide.app?.name && <CopyLink />}
       </header>

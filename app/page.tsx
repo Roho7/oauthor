@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, ArrowUp, Check, Loader2, X } from "lucide-react";
+import { AppLogo } from "@/components/app-logo";
 import { GuideView } from "@/components/guide-view";
 import { DifficultyMeter, type PartialGuide } from "@/components/sections";
 import { Button } from "@/components/ui/button";
@@ -205,12 +206,13 @@ export default function Home() {
               onClick={() => void openGuide(card.slug, true)}
               aria-current={card.slug === activeSlug ? "page" : undefined}
               className={cn(
-                "h-8 shrink-0 rounded-full px-3.5 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                "flex h-8 shrink-0 items-center gap-2 rounded-full pr-3.5 pl-3 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                 card.slug === activeSlug
                   ? "bg-card text-foreground shadow-soft"
                   : "text-muted-foreground hover:bg-secondary hover:text-foreground",
               )}
             >
+              <AppLogo name={card.appName} className="size-4 bg-transparent" />
               {card.appName}
             </button>
           ))}
@@ -343,7 +345,7 @@ function Library({
   return (
     <section>
       <div className="mb-5 px-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Is it an hour or six weeks?</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Get a clear idea on OAuth setups</h1>
         <p className="mt-1 text-[15px] text-muted-foreground">
           What it takes to register an OAuth app with a provider and get it approved. Open a guide, or name any app below.
         </p>
@@ -353,15 +355,19 @@ function Library({
           <CardContent className="px-5 text-sm text-destructive">Library unavailable: {error}</CardContent>
         </Card>
       )}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
           <button
             key={card.slug}
             onClick={() => onOpen(card.slug)}
-            className="group rounded-2xl bg-card p-5 text-left shadow-soft transition-shadow hover:shadow-float focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            role="button"
+            className="group cursor-pointer rounded-2xl bg-card p-5 text-left shadow-soft transition-shadow hover:shadow-float focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-base font-semibold">{card.appName}</span>
+              <span className="flex items-center gap-2.5 text-base font-semibold">
+                <AppLogo name={card.appName} className="size-8 rounded-lg bg-card text-sm shadow-soft" />
+                {card.appName}
+              </span>
               <span className="text-sm text-muted-foreground tnum">{card.level} of 5</span>
             </div>
             <DifficultyMeter level={card.level} className="mt-3" />
@@ -378,12 +384,14 @@ function Library({
           </button>
         ))}
         {cards.length === 0 && !error && (
-          <Card className="py-5 sm:col-span-2 lg:col-span-3">
+          <Card className="py-5 sm:col-span-2 lg:col-span-4">
             <CardContent className="px-5 text-sm text-muted-foreground">
               No guides yet. Name an app below and the first one is written while you watch.
             </CardContent>
           </Card>
         )}
+      </div>
+      <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <Card className="gap-4 py-5 lg:col-span-2">
           <CardContent className="px-5">
             <h2 className="text-base font-medium">How a guide is made</h2>
