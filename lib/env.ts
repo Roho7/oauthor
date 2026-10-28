@@ -5,13 +5,26 @@ const publicSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
 });
 
-const serverSchema = publicSchema.extend({
-  OPENROUTER_API_KEY: z.string().min(1),
-  OAUTHOR_MODEL: z.string().min(1).default("anthropic/claude-sonnet-5.5"),
-  COMPOSIO_API_KEY: z.string().min(1),
-  COMPOSIO_USER_ID: z.string().min(1),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
-});
+const crawlerSchema = z.union([
+  z.object({ FIRECRAWL_API_KEY: z.string().min(1) }).transform((e) => ({
+    crawler: { kind: "firecrawl" as const, apiKey: e.FIRECRAWL_API_KEY },
+  })),
+  z
+    .object({ COMPOSIO_API_KEY: z.string().min(1), COMPOSIO_USER_ID: z.string().min(1) })
+    .transform((e) => ({
+      crawler: { kind: "composio" as const, apiKey: e.COMPOSIO_API_KEY, userId: e.COMPOSIO_USER_ID },
+    })),
+]);
+
+const serverSchema = publicSchema
+  .extend({
+    OPENROUTER_API_KEY: z.string().min(1),
+    OAUTHOR_MODEL: z.string().min(1).default("anthropic/claude-sonnet-5.5"),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  })
+  .and(crawlerSchema);
+
+export type CrawlerConfig = z.infer<typeof crawlerSchema>["crawler"];
 
 function parse<T extends z.ZodType>(schema: T, raw: unknown): z.infer<T> {
   const result = schema.safeParse(raw);
@@ -35,6 +48,9 @@ export function serverEnv() {
   cachedServer ??= parse(serverSchema, {
     ...process.env,
     OAUTHOR_MODEL: process.env.OAUTHOR_MODEL || undefined,
+    FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY || undefined,
+    COMPOSIO_API_KEY: process.env.COMPOSIO_API_KEY || undefined,
+    COMPOSIO_USER_ID: process.env.COMPOSIO_USER_ID || undefined,
   });
   return cachedServer;
 }
