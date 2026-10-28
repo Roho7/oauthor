@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { z } from "zod";
 import { publicEnv } from "./env";
 import { guideRowSchema, slugify, type Guide } from "./guide";
 
@@ -37,15 +38,26 @@ export function anonClient(): Db {
   return anon;
 }
 
-export type LibraryCard = { slug: string; appName: string };
+const cardRowSchema = guideRowSchema.transform((row) => ({
+  slug: row.slug,
+  appName: row.app_name,
+  level: row.guide.difficulty.level,
+  setup: row.guide.time.setup,
+  approvalWait: row.guide.time.approvalWait,
+}));
+
+export type LibraryCard = z.infer<typeof cardRowSchema>;
 
 export async function listCards(): Promise<LibraryCard[]> {
   const { data, error } = await anonClient()
     .from("guides")
-    .select("slug, app_name")
+    .select("slug, app_name, guide")
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => ({ slug: String(row.slug), appName: String(row.app_name) }));
+  return (data ?? []).flatMap((row) => {
+    const card = cardRowSchema.safeParse(row);
+    return card.success ? [card.data] : [];
+  });
 }
 
 export async function getGuide(slug: string): Promise<Guide | null> {

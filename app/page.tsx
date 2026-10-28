@@ -3,8 +3,13 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, ArrowUp, Check, Loader2 } from "lucide-react";
 import { GuideView } from "@/components/guide-view";
-import type { PartialGuide } from "@/components/sections";
+import { DifficultyMeter, type PartialGuide } from "@/components/sections";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { slugify, type Guide } from "@/lib/guide";
 import { getGuide, listCards, type LibraryCard } from "@/lib/store";
 import type { OAuthorMessage, OAuthorTools } from "@/lib/tools";
@@ -31,20 +36,6 @@ function latestRenderPart(messages: OAuthorMessage[]) {
     }
   }
   return null;
-}
-
-function statusLine(messages: OAuthorMessage[], busy: boolean): string | null {
-  if (!busy) return null;
-  const last = messages.at(-1);
-  if (last?.role !== "assistant") return "Thinking…";
-  const tail = last.parts.at(-1);
-  if (tail?.type === "text") return null;
-  if (tail?.type.startsWith("tool-")) {
-    const done = "state" in tail && (tail.state === "output-available" || tail.state === "output-error");
-    const name = tail.type.slice(5) as ToolName;
-    if (!done && name in STATUS) return STATUS[name];
-  }
-  return "Thinking…";
 }
 
 function assistantText(messages: OAuthorMessage[]): string {
@@ -127,7 +118,11 @@ export default function Home() {
       : undefined
     : opened?.slug;
 
-  const line = statusLine(messages, busy);
+  const goHome = () => {
+    setOpened(null);
+    setHiddenLive(liveKey.current);
+    window.history.pushState(null, "", window.location.pathname);
+  };
   const text = assistantText(messages);
   const renderFailed = live?.part.state === "output-error" ? live.part.errorText : null;
 
@@ -139,67 +134,243 @@ export default function Home() {
     void sendMessage({ text: value }, { body: { openApp: activeSlug } });
   };
 
+  const steps = progress(messages, busy);
+
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 pb-56 pt-8">
-      <h1 className="text-xl font-semibold tracking-tight">OAuthor</h1>
-      <p className="text-sm text-zinc-500">Know if it&apos;s an hour or six weeks.</p>
+    <div className="min-h-screen pb-48">
+      <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 pt-6 sm:px-6">
+        <button
+          onClick={goHome}
+          className="text-[15px] font-semibold tracking-tight focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          OAuthor
+        </button>
+        <nav className="-mx-1 flex min-w-0 flex-1 gap-1 overflow-x-auto px-1 py-1" aria-label="Library">
+          {cards.map((card) => (
+            <button
+              key={card.slug}
+              onClick={() => void openGuide(card.slug, true)}
+              aria-current={card.slug === activeSlug ? "page" : undefined}
+              className={cn(
+                "h-8 shrink-0 rounded-full px-3.5 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                card.slug === activeSlug
+                  ? "bg-card text-foreground shadow-soft"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+              )}
+            >
+              {card.appName}
+            </button>
+          ))}
+        </nav>
+      </header>
 
-      <nav className="mt-6 flex flex-wrap gap-2" aria-label="Library">
-        {cards.map((card) => (
-          <button
-            key={card.slug}
-            onClick={() => void openGuide(card.slug, true)}
-            className={`rounded-lg border px-3 py-1.5 text-sm transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900 ${
-              card.slug === activeSlug
-                ? "border-zinc-900 dark:border-zinc-100"
-                : "border-zinc-200 dark:border-zinc-800"
-            }`}
-          >
-            {card.appName}
-          </button>
-        ))}
-        {cards.length === 0 && !libraryError && (
-          <span className="text-sm text-zinc-500">No guides yet. Ask about an app below.</span>
+      <main className="mx-auto w-full max-w-6xl px-4 pt-8 sm:px-6">
+        {steps && <Progress steps={steps} />}
+        {renderFailed && (
+          <Card className="mb-3 py-4">
+            <CardContent className="px-5 text-sm text-destructive">Could not save the guide: {renderFailed}</CardContent>
+          </Card>
         )}
-        {libraryError && <span className="text-sm text-red-600">Library unavailable: {libraryError}</span>}
-      </nav>
-
-      <main className="mt-8 flex-1">
-        {line && <div className="mb-4 animate-pulse text-sm text-zinc-500">{line}</div>}
-        {renderFailed && <div className="mb-4 text-sm text-red-600">Could not save the guide: {renderFailed}</div>}
         {shown ? (
           <GuideView guide={shown} streaming={streaming} />
         ) : opened && !opened.guide ? (
-          <p className="text-zinc-500">No saved guide for &ldquo;{opened.slug}&rdquo; yet. Ask for one below.</p>
+          <EmptyGuide slug={opened.slug} onAsk={(v) => setInput(v)} />
         ) : (
-          !line && <p className="text-zinc-500">Pick a guide above, or type an app&apos;s name to generate one.</p>
+          !steps && (
+            <Library
+              cards={cards}
+              error={libraryError}
+              onOpen={(slug) => void openGuide(slug, true)}
+              onTry={(app) => setInput(`Write the OAuth setup guide for ${app}`)}
+            />
+          )
         )}
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-zinc-200 bg-background/95 backdrop-blur dark:border-zinc-800">
-        <div className="mx-auto w-full max-w-3xl space-y-3 px-4 py-3">
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 px-4 pb-5 sm:px-6">
+        <div className="pointer-events-auto mx-auto w-full max-w-3xl space-y-3">
           {(text || error) && (
-            <div className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900">
-              {error ? <span className="text-red-600">{error.message}</span> : text}
+            <div className="max-h-48 overflow-y-auto rounded-2xl bg-card px-5 py-4 text-sm leading-6 whitespace-pre-wrap shadow-float">
+              {error ? <span className="text-destructive">{error.message}</span> : text}
             </div>
           )}
-          <form onSubmit={submit} className="flex gap-2">
-            <input
+          <form onSubmit={submit} className="flex items-center gap-2 rounded-full bg-card p-1.5 pl-5 shadow-float">
+            <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about an app…"
-              className="flex-1 rounded-lg border border-zinc-300 bg-transparent px-3 py-2 outline-none focus:border-zinc-900 dark:border-zinc-700 dark:focus:border-zinc-100"
+              placeholder={activeSlug ? "Ask about this guide" : "Name any app, like Zoom"}
+              aria-label="Ask about an app"
+              className="h-10 flex-1 border-0 bg-transparent px-0 text-[15px] shadow-none focus-visible:ring-0"
             />
-            <button
-              type="submit"
-              disabled={busy || !input.trim()}
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
-            >
-              Send
-            </button>
+            <Button type="submit" disabled={busy || !input.trim()} size="icon" className="size-10 rounded-full" aria-label="Send">
+              {busy ? <Loader2 className="animate-spin" /> : <ArrowUp />}
+            </Button>
           </form>
         </div>
       </div>
     </div>
+  );
+}
+
+type Step = { label: string; state: "done" | "active" | "todo" };
+
+function progress(messages: OAuthorMessage[], busy: boolean): Step[] | null {
+  if (!busy) return null;
+  const last = messages.at(-1);
+  const parts = last?.role === "assistant" ? last.parts : [];
+  const seen = (name: ToolName) => parts.some((p) => p.type === `tool-${name}`);
+  const order: ToolName[] = ["get_guide", "research_app", "render_guide"];
+  const current = [...order].reverse().find(seen);
+  const idx = current ? order.indexOf(current) : -1;
+  if (idx === -1 && parts.some((p) => p.type === "text")) return null;
+  return order.map((name, i) => ({
+    label: STATUS[name],
+    state: i < idx ? "done" : i === idx || (idx === -1 && i === 0) ? "active" : "todo",
+  }));
+}
+
+function Progress({ steps }: { steps: Step[] }) {
+  return (
+    <Card className="mb-3 py-4" aria-live="polite">
+      <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 text-sm">
+        {steps.map((step) => (
+          <span
+            key={step.label}
+            className={cn(
+              "flex items-center gap-2",
+              step.state === "todo" ? "text-muted-foreground" : "text-foreground",
+            )}
+          >
+            {step.state === "done" ? (
+              <Check className="size-4 text-muted-foreground" />
+            ) : step.state === "active" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <span className="mx-1 size-2 rounded-full bg-secondary" />
+            )}
+            {step.label.replace("…", "")}
+          </span>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+const SUGGESTIONS = ["Meta Ads", "Gmail", "Twitter/X", "HubSpot", "Zoom", "Notion"];
+
+function Library({
+  cards,
+  error,
+  onOpen,
+  onTry,
+}: {
+  cards: LibraryCard[];
+  error: string | null;
+  onOpen: (slug: string) => void;
+  onTry: (app: string) => void;
+}) {
+  const saved = new Set(cards.map((c) => c.slug));
+  return (
+    <section>
+      <div className="mb-5 px-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Is it an hour or six weeks?</h1>
+        <p className="mt-1 text-[15px] text-muted-foreground">
+          What it takes to register an OAuth app with a provider and get it approved. Open a guide, or name any app below.
+        </p>
+      </div>
+      {error && (
+        <Card className="py-4">
+          <CardContent className="px-5 text-sm text-destructive">Library unavailable: {error}</CardContent>
+        </Card>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {cards.map((card) => (
+          <button
+            key={card.slug}
+            onClick={() => onOpen(card.slug)}
+            className="group rounded-2xl bg-card p-5 text-left shadow-soft transition-shadow hover:shadow-float focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-base font-semibold">{card.appName}</span>
+              <span className="text-sm text-muted-foreground tnum">{card.level} of 5</span>
+            </div>
+            <DifficultyMeter level={card.level} className="mt-3" />
+            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">Setup</dt>
+                <dd className="mt-0.5 line-clamp-2">{card.setup}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Review</dt>
+                <dd className="mt-0.5 line-clamp-2">{card.approvalWait ?? "None"}</dd>
+              </div>
+            </dl>
+          </button>
+        ))}
+        {cards.length === 0 && !error && (
+          <Card className="py-5 sm:col-span-2 lg:col-span-3">
+            <CardContent className="px-5 text-sm text-muted-foreground">
+              No guides yet. Name an app below and the first one is written while you watch.
+            </CardContent>
+          </Card>
+        )}
+        <Card className="gap-4 py-5 lg:col-span-2">
+          <CardContent className="px-5">
+            <h2 className="text-base font-medium">How a guide is made</h2>
+            <ol className="mt-4 grid gap-3 text-sm leading-6 sm:grid-cols-3">
+              {[
+                ["Checks the library", "A saved guide opens instantly, with nothing re-fetched."],
+                ["Reads the provider's docs", "Two searches, then up to six developer pages read in full."],
+                ["Writes it here", "Each box fills in as it is written, then the guide gets its own link."],
+              ].map(([title, detail], i) => (
+                <li key={title} className="rounded-xl bg-muted p-4">
+                  <span className="flex size-7 items-center justify-center rounded-full bg-card text-xs font-medium tnum shadow-soft">
+                    {i + 1}
+                  </span>
+                  <p className="mt-3 font-medium">{title}</p>
+                  <p className="mt-1 text-muted-foreground">{detail}</p>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-4 text-sm text-muted-foreground">A new app takes under a minute; the Xero guide took 43 seconds.</p>
+          </CardContent>
+        </Card>
+        <Card className="gap-4 py-5">
+          <CardContent className="px-5">
+            <h2 className="text-base font-medium">Try another app</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Pick one to fill the box below, then send it.</p>
+            <ul className="mt-4 space-y-1">
+              {SUGGESTIONS.filter((app) => !saved.has(slugify(app))).map((app) => (
+                <li key={app}>
+                  <button
+                    onClick={() => onTry(app)}
+                    className="group flex h-10 w-full items-center justify-between rounded-xl px-3 text-sm transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  >
+                    {app}
+                    <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+    </section>
+  );
+}
+
+function EmptyGuide({ slug, onAsk }: { slug: string; onAsk: (value: string) => void }) {
+  return (
+    <Card className="py-6">
+      <CardContent className="flex flex-wrap items-center justify-between gap-4 px-6">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">No guide for {slug} yet</h1>
+          <p className="mt-1 text-sm text-muted-foreground">It takes about a minute to research and write one.</p>
+        </div>
+        <Button className="h-9 rounded-full px-4" onClick={() => onAsk(`Write the OAuth setup guide for ${slug}`)}>
+          Write it
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
