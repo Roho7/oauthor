@@ -64,15 +64,15 @@ Built with Claude using my custom [/pstack](https://github.com/cursor/plugins/tr
 <img width="1594" height="654" alt="image" src="https://github.com/user-attachments/assets/6d01976f-3359-43a5-b6f8-ad12f3e74b23" />
 
 - **Subagent orchestration.** A subagent built v0 from the spec. I reviewed its diff, reran its checks myself, and had a second agent build verification steps.
-- **Tests.** The first Spotify guide said it couldn't read the quota rules. Spotify's sidebar links filled the first 6,000 characters of every page, so the scraper now drops link-only lines before it truncates. Built [`repairGuideInput`](lib/guide.ts) that now fixes it before validation, and the smoke test replays the exact failure.
+- **Tests.** Ran into some bugs while testing the flow with Spotify. Built smoke test, real end-to-end runs (generating actual guides through /api/chat), UI checks (using the taste-skill inspector)
 - **Taste.** I use a [/taste-skill](https://github.com/leonxlnx/taste-skill) to build anti-slop UI although this one is kept quite simple. Shadcn for everything. After V0 was built, I invoked the skill with specific instructions to make the product polished.
 
 ## What's solid, and what isn't
 
 | | |
 |---|---|
-| **Backed by sources** | Every guide is extracted only from the pages `research_app` returned, and lists them under Sources. No chance of Hallucinating|
-| **Uncertain** | Difficulty, time and `agentCompatible` are the model's judgement from those docs. I verified only those which I have personally worked on like Meta, Google and Github OAuth and can vouch that they are feel accurate - ish. I didn't spend too much time refining the prompt or giving the Agent references to score better instead I focussed on the experience. Some answers are wrong in ways only a careful read catches: Xero says "No review step" although App Partner certification is a review. |
+| **Referenced Information** | Every guide is extracted only from the pages `research_app` returned, and lists them under Sources. No chance of Hallucinating|
+| **Scoring Is Guesswork** | Difficulty, time and `agentCompatible` are the model's judgement from those docs. I verified only those which I have personally worked on like Meta, Google and Github OAuth and can vouch that they are feel accurate - ish. I didn't spend too much time refining the prompt or giving the Agent references to score better instead I focussed on the experience. Some answers are wrong in ways only a careful read catches: Xero says "No review step" although App Partner certification is a review. |
 
 ## Product Decisions
 1. User: a developer on Composio who brings their own OAuth app, either because the toolkit has no managed app or because they’re going to production.
