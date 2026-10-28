@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, ArrowUp, Check, Loader2, X } from "lucide-react";
+import { ArrowRight, ArrowUp, Check, Loader2, RefreshCw, X } from "lucide-react";
 import { AppLogo } from "@/components/app-logo";
 import { GuideView } from "@/components/guide-view";
 import { DifficultyMeter, type PartialGuide } from "@/components/sections";
@@ -328,7 +328,24 @@ function Progress({ steps }: { steps: Step[] }) {
   );
 }
 
-const SUGGESTIONS = ["Meta Ads", "Gmail", "Twitter/X", "HubSpot", "Zoom", "Notion"];
+const SUGGESTIONS = [
+  "GitHub",
+  "Slack",
+  "HubSpot",
+  "Zoom",
+  "Meta Ads",
+  "Salesforce",
+  "Dropbox",
+  "Asana",
+  "Shopify",
+  "Stripe",
+  "LinkedIn",
+  "Figma",
+  "Discord",
+  "Jira",
+  "Calendly",
+];
+const SUGGESTIONS_SHOWN = 5;
 
 function Library({
   cards,
@@ -342,6 +359,11 @@ function Library({
   onTry: (app: string) => void;
 }) {
   const saved = new Set(cards.map((c) => c.slug));
+  const [page, setPage] = useState(0);
+  const unsaved = SUGGESTIONS.filter((app) => !saved.has(slugify(app)));
+  const pages = Math.max(1, Math.ceil(unsaved.length / SUGGESTIONS_SHOWN));
+  const start = (page % pages) * SUGGESTIONS_SHOWN;
+  const shownSuggestions = unsaved.slice(start, start + SUGGESTIONS_SHOWN);
   return (
     <section>
       <div className="mb-5 px-1">
@@ -415,16 +437,31 @@ function Library({
         </Card>
         <Card className="gap-4 py-5">
           <CardContent className="px-5">
-            <h2 className="text-base font-medium">Try another app</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-medium">Try another app</h2>
+              {pages > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => p + 1)}
+                  className="flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <RefreshCw className="size-3" />
+                  More
+                </button>
+              )}
+            </div>
             <p className="mt-1 text-sm text-muted-foreground">Get started with one of these apps.</p>
             <ul className="mt-4 space-y-1">
-              {SUGGESTIONS.filter((app) => !saved.has(slugify(app))).map((app) => (
+              {shownSuggestions.map((app) => (
                 <li key={app}>
                   <button
                     onClick={() => onTry(app)}
                     className="group flex h-10 w-full items-center justify-between rounded-xl px-3 text-sm transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                   >
-                    {app}
+                    <span className="flex items-center gap-2.5">
+                      <AppLogo name={app} className="size-6 bg-transparent text-xs" />
+                      {app}
+                    </span>
                     <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   </button>
                 </li>
