@@ -59,7 +59,10 @@ Guides, once generated, are stored in a database for persistence.
 
 Built with Claude using my custom [/pstack](https://github.com/cursor/plugins/tree/main/pstack) setup.
 
-- **Spec by interrogation.** I had Claude Code [/grill-me](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me) one question at a time until the deliverable was pinned down. I decided on who the user is, what the guide must answer, and what to leave out. The decisions are in [`SPEC.md`](SPEC.md).
+- **Spec generation.** I had Claude Code [/grill-me](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me) one question at a time until the deliverable was pinned down. I decided on who the user is, what the guide must answer, and what to leave out. The decisions are in [`SPEC.md`](SPEC.md).
+
+<img width="1594" height="654" alt="image" src="https://github.com/user-attachments/assets/6d01976f-3359-43a5-b6f8-ad12f3e74b23" />
+
 - **Subagent orchestration.** A subagent built v0 from the spec. I reviewed its diff, reran its checks myself, and had a second agent build verification steps.
 - **Tests.** The first Spotify guide said it couldn't read the quota rules. Spotify's sidebar links filled the first 6,000 characters of every page, so the scraper now drops link-only lines before it truncates. Built [`repairGuideInput`](lib/guide.ts) that now fixes it before validation, and the smoke test replays the exact failure.
 - **Taste.** I use a [/taste-skill](https://github.com/leonxlnx/taste-skill) to build anti-slop UI although this one is kept quite simple. Shadcn for everything. After V0 was built, I invoked the skill with specific instructions to make the product polished.
@@ -68,9 +71,8 @@ Built with Claude using my custom [/pstack](https://github.com/cursor/plugins/tr
 
 | | |
 |---|---|
-| **Tested** | Real end-to-end runs for all five guides: docs fetched, guide streamed, validated and saved. Saved guides survive schema changes, because old rows are migrated when they're read. The smoke test covers the schema, slugs, the JSON repair and the migration. |
-| **Backed by sources** | Every guide is extracted only from the pages `research_app` returned, and lists them under Sources. |
-| **Uncertain** | Difficulty, time and `agentCompatible` are the model's judgement from those docs. No agent has tried a real setup yet. Some answers are wrong in ways only a careful read catches: Xero says "No review step" although App Partner certification is a review. |
+| **Backed by sources** | Every guide is extracted only from the pages `research_app` returned, and lists them under Sources. No chance of Hallucinating|
+| **Uncertain** | Difficulty, time and `agentCompatible` are the model's judgement from those docs. I verified only those which I have personally worked on like Meta, Google and Github OAuth and can vouch that they are feel accurate - ish. I didn't spend too much time refining the prompt or giving the Agent references to score better instead I focussed on the experience. Some answers are wrong in ways only a careful read catches: Xero says "No review step" although App Partner certification is a review. |
 
 ## Decisions
 1. Used Firecrawl to grab actual data. API docs / setup pages update frequently, a live fetch is better. 
@@ -88,6 +90,9 @@ Built with Claude using my custom [/pstack](https://github.com/cursor/plugins/tr
 | `steps[].agentCompatible` | What can I hand off? Steps an agent with browser access could do get an **AI can do this** badge. |
 | `issues` | Where do people get stuck? At most 5, each with its fix. |
 | `references` | Which pages is this based on? |
+
+<img width="1028" height="352" alt="image" src="https://github.com/user-attachments/assets/3f333b1f-19b6-41f0-8f48-e38bd0fc29d0" />
+
 
 
 ## Run it locally
