@@ -10,10 +10,8 @@ const crawlerSchema = z.union([
     crawler: { kind: "firecrawl" as const, apiKey: e.FIRECRAWL_API_KEY },
   })),
   z
-    .object({ COMPOSIO_API_KEY: z.string().min(1), COMPOSIO_USER_ID: z.string().min(1) })
-    .transform((e) => ({
-      crawler: { kind: "composio" as const, apiKey: e.COMPOSIO_API_KEY, userId: e.COMPOSIO_USER_ID },
-    })),
+    .object({ COMPOSIO_API_KEY: z.string().min(1) })
+    .transform((e) => ({ crawler: { kind: "composio" as const, apiKey: e.COMPOSIO_API_KEY } })),
 ]);
 
 const serverSchema = publicSchema
@@ -50,7 +48,6 @@ export function serverEnv() {
     OAUTHOR_MODEL: process.env.OAUTHOR_MODEL || undefined,
     FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY || undefined,
     COMPOSIO_API_KEY: process.env.COMPOSIO_API_KEY || undefined,
-    COMPOSIO_USER_ID: process.env.COMPOSIO_USER_ID || undefined,
   });
   return cachedServer;
 }

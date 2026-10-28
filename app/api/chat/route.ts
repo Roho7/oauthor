@@ -9,6 +9,7 @@ import {
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
 import { serverEnv } from "@/lib/env";
+import { repairGuideInput } from "@/lib/guide";
 import { systemPrompt } from "@/lib/prompt";
 import { createTools, type OAuthorMessage } from "@/lib/tools";
 
@@ -40,6 +41,11 @@ export async function POST(req: Request) {
     messages: await convertToModelMessages(messages, { tools }),
     tools,
     stopWhen: isStepCount(8),
+    repairToolCall: async ({ toolCall }) => {
+      if (toolCall.toolName !== "render_guide") return null;
+      const input = repairGuideInput(toolCall.input);
+      return input ? { ...toolCall, input } : null;
+    },
   });
 
   return createUIMessageStreamResponse({

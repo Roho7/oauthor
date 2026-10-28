@@ -1,3 +1,4 @@
+import { jsonrepair } from "jsonrepair";
 import { z } from "zod";
 
 export const guideSchema = z.object({
@@ -29,6 +30,37 @@ export const guideSchema = z.object({
 });
 
 export type Guide = z.infer<typeof guideSchema>;
+
+const GUIDE_KEYS = Object.keys(guideSchema.shape);
+
+const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+
+function hoistGuideKeys(root: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const queue = [root];
+  for (const obj of queue) {
+    for (const [key, value] of Object.entries(obj)) {
+      if (GUIDE_KEYS.includes(key) && !(key in out)) out[key] = value;
+      if (isRecord(value)) queue.push(value);
+    }
+  }
+  for (const [key, value] of Object.entries(out)) {
+    if (isRecord(value)) out[key] = Object.fromEntries(Object.entries(value).filter(([k]) => !GUIDE_KEYS.includes(k)));
+  }
+  return out;
+}
+
+export function repairGuideInput(raw: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonrepair(raw));
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) return null;
+  const hoisted = hoistGuideKeys(parsed);
+  return guideSchema.safeParse(hoisted).success ? JSON.stringify(hoisted) : null;
+}
 
 export const guideRowSchema = z.object({
   slug: z.string(),

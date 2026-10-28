@@ -59,11 +59,11 @@ function walk(value: unknown, visit: (obj: Record<string, unknown>) => void) {
 
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
 
-function composio(apiKey: string, userId: string): Crawler {
+function composio(apiKey: string): Crawler {
   const client = new Composio({ apiKey });
 
   async function run(slug: string, args: Record<string, unknown>): Promise<unknown> {
-    const res = await client.tools.execute(slug, { userId, arguments: args, dangerouslySkipVersionCheck: true });
+    const res = await client.tools.execute(slug, { arguments: args, dangerouslySkipVersionCheck: true });
     if (!res.successful) throw new Error(`${slug} failed: ${res.error ?? "unknown error"}`);
     return res.data;
   }
@@ -89,5 +89,5 @@ function composio(apiKey: string, userId: string): Crawler {
 }
 
 export function createCrawler(config: CrawlerConfig): Crawler {
-  return config.kind === "firecrawl" ? firecrawl(config.apiKey) : composio(config.apiKey, config.userId);
+  return config.kind === "firecrawl" ? firecrawl(config.apiKey) : composio(config.apiKey);
 }

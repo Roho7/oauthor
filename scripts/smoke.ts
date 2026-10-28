@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { guideSchema, slugify } from "../lib/guide";
+import { guideSchema, repairGuideInput, slugify } from "../lib/guide";
 
 const valid = {
   app: { name: "Spotify", website: "https://developer.spotify.com" },
@@ -38,5 +38,10 @@ assert.equal(slugify("Zoho CRM (EU)"), "zoho-crm-eu");
 assert.equal(slugify("Café"), "cafe");
 assert.equal(slugify("spotify"), "spotify");
 assert.equal(slugify("???"), "");
+
+const unclosedAgentHelp = JSON.stringify(valid).replace('"]},"steps"', '"],"steps"').replace(/}$/, "");
+assert.throws(() => JSON.parse(unclosedAgentHelp), "fixture is broken JSON");
+assert.deepEqual(JSON.parse(repairGuideInput(unclosedAgentHelp) ?? "null"), valid, "unclosed agentHelp repaired");
+assert.equal(repairGuideInput('{"app": {"name": "X"'), null, "unrepairable input returns null");
 
 console.log("smoke: all assertions passed");
