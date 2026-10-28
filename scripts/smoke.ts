@@ -21,7 +21,8 @@ const badLevel = guideSchema.safeParse({ ...valid, difficulty: { level: 6, why: 
 assert.ok(!badLevel.success, "difficulty level 6 rejected");
 
 assert.ok(
-  !guideSchema.safeParse({ ...valid, steps: undefined }).success,   "guide without steps rejected",
+  !guideSchema.safeParse({ ...valid, steps: undefined }).success,
+  "guide without steps rejected",
 );
 
 assert.ok(
