@@ -153,10 +153,11 @@ export default function Home() {
 
   const lines = threadLines(messages);
   const lastLine = lines.at(-1)?.text;
+  const stepsKey = progress(messages, busy)?.map((st) => st.state).join();
   useEffect(() => {
     const box = threadBox.current;
     if (box) box.scrollTop = box.scrollHeight;
-  }, [lines.length, lastLine, chatOpen]);
+  }, [lines.length, lastLine, chatOpen, stepsKey]);
 
   const showLive = live != null && live.key !== hiddenLive && live.part.state !== "output-error";
   const liveGuide = showLive ? (live.part.input as PartialGuide | undefined) : undefined;
@@ -217,7 +218,6 @@ export default function Home() {
       </header>
 
       <main className="mx-auto w-full max-w-6xl px-4 pt-8 sm:px-6">
-        {steps && <Progress steps={steps} />}
         {renderFailed && (
           <Card className="mb-3 py-4">
             <CardContent className="px-5 text-sm text-destructive">Could not save the guide: {renderFailed}</CardContent>
@@ -228,7 +228,7 @@ export default function Home() {
         ) : opened && !opened.guide ? (
           <EmptyGuide slug={opened.slug} onAsk={(v) => setInput(v)} />
         ) : (
-          !steps && (
+          (
             <Library
               cards={cards}
               error={libraryError}
@@ -241,7 +241,7 @@ export default function Home() {
 
       <div className="pointer-events-none fixed inset-x-0 bottom-0 px-4 pb-5 sm:px-6">
         <div className="pointer-events-auto mx-auto w-full max-w-3xl space-y-3">
-          {chatOpen && (lines.length > 0 || error) && (
+          {chatOpen && (lines.length > 0 || error || steps) && (
             <div className="relative rounded-2xl bg-card shadow-float">
               <button
                 type="button"
@@ -263,6 +263,7 @@ export default function Home() {
                     </p>
                   ),
                 )}
+                {steps && <Progress steps={steps} />}
                 {error && <p className="text-destructive">{error.message}</p>}
               </div>
             </div>
@@ -305,28 +306,23 @@ function progress(messages: OAuthorMessage[], busy: boolean): Step[] | null {
 
 function Progress({ steps }: { steps: Step[] }) {
   return (
-    <Card className="mb-3 py-4" aria-live="polite">
-      <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 text-sm">
-        {steps.map((step) => (
-          <span
-            key={step.label}
-            className={cn(
-              "flex items-center gap-2",
-              step.state === "todo" ? "text-muted-foreground" : "text-foreground",
-            )}
-          >
-            {step.state === "done" ? (
-              <Check className="size-4 text-muted-foreground" />
-            ) : step.state === "active" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <span className="mx-1 size-2 rounded-full bg-secondary" />
-            )}
-            {step.label.replace("…", "")}
-          </span>
-        ))}
-      </CardContent>
-    </Card>
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-xl bg-muted px-3.5 py-2.5 text-[13px]">
+      {steps.map((step) => (
+        <span
+          key={step.label}
+          className={cn("flex items-center gap-1.5", step.state === "todo" ? "text-muted-foreground" : "text-foreground")}
+        >
+          {step.state === "done" ? (
+            <Check className="size-3.5 text-muted-foreground" />
+          ) : step.state === "active" ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <span className="mx-1 size-1.5 rounded-full bg-foreground/25" />
+          )}
+          {step.label.replace("…", "")}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -406,13 +402,13 @@ function Library({
                 </li>
               ))}
             </ol>
-            <p className="mt-4 text-sm text-muted-foreground">A new app takes under a minute; the Xero guide took 43 seconds.</p>
+            <p className="mt-4 text-sm text-muted-foreground">Get a full OAuth setup guide in under a minute.</p>
           </CardContent>
         </Card>
         <Card className="gap-4 py-5">
           <CardContent className="px-5">
             <h2 className="text-base font-medium">Try another app</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Pick one to fill the box below, then send it.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Get started with one of these apps.</p>
             <ul className="mt-4 space-y-1">
               {SUGGESTIONS.filter((app) => !saved.has(slugify(app))).map((app) => (
                 <li key={app}>
