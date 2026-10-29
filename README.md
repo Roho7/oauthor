@@ -20,7 +20,7 @@ Type any app's name, an agent reads the provider's developer docs, and writes yo
 
 ## Demo
 
-Five guides are in the library, picked to cover the whole range.
+Five guides (probably more now) are already in the library, which I picked to cover the whole range.
 
 | App | Difficulty | What decides it |
 |---|---|---|
@@ -46,37 +46,55 @@ research_app(name)   → 2 Firecrawl searches, then up to 6 doc pages read in fu
 render_guide(guide)  → stream the guide into the page, validate it, save it to Supabase
 ```
 
-The guide streams in as JSON. Follow the progress row in the chat bubble to see which tool is running.
+The guide streams in as JSON and builds a Bento grid UI generatively. The progress bar in the chat bubble shows which tool is running. The guide is persisted once anybody generates a new one. If a guide for an app already exists, the Agent just redirects you to it. 
 
-Continue chatting with the agent for more information. 
+After the guide comes through, the chat bubble can still be used to ask more questions to the Agent about the integrations. Continue chatting with the agent for more information. 
 
 Each app guide has its own conversation [stored locally in your browser (IndexedDB)]. 
 Guides, once generated, are stored in a database for persistence. 
 
+Each guide tells you a difficulty score, time to implement and lead time (for approval cycle). It contains steps to tell you how to proceed and, most importantly, where the common bottlenecks are. The last section are the references from the official sources which the developer can go and read. 
 
 
 ## How I built it
 
-Built with Claude using my custom [/pstack](https://github.com/cursor/plugins/tree/main/pstack) setup.
+Began work on this at around ~12:30PM and was done around ~6PM. The major time was spent researching what would make this useful and how Composio would benefit from a feature like this. Researched [Nango](https://nango.dev/api-integrations) as well. I am pretty experienced with OAuth registrations from working at my previous companies so I understood the pain point pretty well from the get go. What I was unsure of was the modality - how to present the data, what to include in the data, what would be useful to me. Landed on a Bento grid approach with generative UI.
 
-- **Spec by interrogation.** I had Claude Code [/grill-me](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me) one question at a time until the deliverable was pinned down. I decided on who the user is, what the guide must answer, and what to leave out. The decisions are in [`SPEC.md`](SPEC.md).
+I built this with Claude using my custom [/pstack](https://github.com/cursor/plugins/tree/main/pstack) setup.
+
+- **Spec generation.** I had Claude Code [/grill-me](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me) one question at a time until the deliverable was pinned down. I decided on who the user is, what the guide must answer, and what to leave out. The decisions are in [`SPEC.md`](SPEC.md).
+
+<img width="1594" height="654" alt="image" src="https://github.com/user-attachments/assets/6d01976f-3359-43a5-b6f8-ad12f3e74b23" />
+
 - **Subagent orchestration.** A subagent built v0 from the spec. I reviewed its diff, reran its checks myself, and had a second agent build verification steps.
-- **Tests.** The first Spotify guide said it couldn't read the quota rules. Spotify's sidebar links filled the first 6,000 characters of every page, so the scraper now drops link-only lines before it truncates. Built [`repairGuideInput`](lib/guide.ts) that now fixes it before validation, and the smoke test replays the exact failure.
+- **Tests.** Ran into some bugs while testing the flow with Spotify. Built smoke test, real end-to-end runs (generating actual guides through /api/chat), UI checks (using the taste-skill inspector)
 - **Taste.** I use a [/taste-skill](https://github.com/leonxlnx/taste-skill) to build anti-slop UI although this one is kept quite simple. Shadcn for everything. After V0 was built, I invoked the skill with specific instructions to make the product polished.
 
 ## What's solid, and what isn't
 
 | | |
 |---|---|
-| **Tested** | Real end-to-end runs for all five guides: docs fetched, guide streamed, validated and saved. Saved guides survive schema changes, because old rows are migrated when they're read. The smoke test covers the schema, slugs, the JSON repair and the migration. |
-| **Backed by sources** | Every guide is extracted only from the pages `research_app` returned, and lists them under Sources. |
-| **Uncertain** | Difficulty, time and `agentCompatible` are the model's judgement from those docs. No agent has tried a real setup yet. Some answers are wrong in ways only a careful read catches: Xero says "No review step" although App Partner certification is a review. |
+| **Referenced Information** | Every guide is extracted only from the pages `research_app` returned, and lists them under Sources. No chance of Hallucinating|
+| **Scoring Is Guesswork** | Difficulty, time and `agentCompatible` are the model's judgement from those docs. I verified only those which I have personally worked on like Meta, Google and Github OAuth and can vouch that they are feel accurate - ish. I didn't spend too much time refining the prompt or giving the Agent references to score better instead I focussed on the experience. Some answers are wrong in ways only a careful read catches: Xero says "No review step" although App Partner certification is a review. |
 
-## Decisions
-1. Used Firecrawl to grab actual data. API docs / setup pages update frequently, a live fetch is better. 
-2. Used Openrouter. Because I had credits lying around.
-3. Just text is unusable. This is where I spent most time on, thinking about the modality of the tool. A simple chat box is too bland and boring, so the UI is generated by a structured response from the Agent. It keeps the guides consistent and organized. 
-4. Introduced a troubleshooting section. The initial spec had "What you need to do vs What an Agent can do", I folded that into the steps and introduced a Troubleshooting section because that is the most important piece of knowledge that can vary quite a bit between applications. 
+## Product Decisions
+1. User: a developer on Composio who brings their own OAuth app, either because the toolkit has no managed app or because they’re going to production.
+2. Deliverable: a single page app with a library of guides plus live generation for any app name.
+3. Output: whatever the agent returns should render as UI, never plain paragraphs. It needs to feel like a **modular library**.
+4. Guide layout: Verdict, then Before you start, Who does what, Steps, If you’re stuck, Sources. Logical reading pattern.
+6. a single page: library cards, a chat box at the bottom, sections filling in one by one during a run, no redirect, and a shareable via query param links: `?app=github`.
+7. Chat: a real chat. First I stored only guides, not the conversations. but later I decided to store conversations in IndexedDB.)
+8. Library apps: Spotify, Xero, DocuSign, Meta Ads, Twitter/X, Gmail. (Later: the library became Spotify, Xero, DocuSign, Gmail and Notion.)
+
+## Technical Decisions
+1. Schema: kept to the brief’s needs: app, difficulty, time (setup and approval wait), requirements, agentHelp, steps, blockers, references. Per-step owner tags were dropped for v0 because the right level of detail was unclear. (Later: steps got an agentCompatible flag and agentHelp was removed.)
+2. Agent: one model with tools: `research_app`, then `render_guide`, plus `get_guide` to read Supabase for an open guide or to skip research when a guide already exists.
+3. Model: Claude Sonnet 5.5 via OpenRouter, with Zod validation.
+4. Storage: Supabase. Already have an account, so reused it. 
+5. Used Firecrawl to grab actual data. API docs / setup pages update frequently, a live fetch is better.
+Used Openrouter. Because I had credits lying around.
+6. Just text is unusable. This is where I spent most time on, thinking about the modality of the tool. A simple chat box is too bland and boring, so the UI is generated by a structured response from the Agent. It keeps the guides consistent and organized.
+7. Introduced a troubleshooting section. The initial spec had "What you need to do vs What an Agent can do", I folded that into the steps and introduced a Troubleshooting section because that is the most important piece of knowledge that can vary quite a bit between applications. 
 
 ## The guide Schema
 
@@ -88,6 +106,9 @@ Built with Claude using my custom [/pstack](https://github.com/cursor/plugins/tr
 | `steps[].agentCompatible` | What can I hand off? Steps an agent with browser access could do get an **AI can do this** badge. |
 | `issues` | Where do people get stuck? At most 5, each with its fix. |
 | `references` | Which pages is this based on? |
+
+<img width="1028" height="352" alt="image" src="https://github.com/user-attachments/assets/3f333b1f-19b6-41f0-8f48-e38bd0fc29d0" />
+
 
 
 ## Run it locally
